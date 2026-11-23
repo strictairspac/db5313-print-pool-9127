@@ -8,6 +8,7 @@ from src.config.settings import cache, engine
 from src.constants.workflow import Status
 from src.models.tables import audit, cases, evidence, runs
 from src.services import domain
+from src.services import tickets as ticket_store
 from src.utils.encoding import canonical
 from src.utils.time import utc_time
 
@@ -42,6 +43,9 @@ def make_case(title, payload, actor):
     with engine.begin() as conn:
         case_id = conn.execute(cases.insert().values(slug=uuid.uuid4().hex, title=title, payload=payload,
                                author=actor, created_at=utc_time())).inserted_primary_key[0]
+        # 双写：档案 JSON 保持完整（旧版回滚可读），取号单同时落入新表。
+        ticket_store.upsert(conn, case_id,
+                            [ticket_store.normalize(raw) for raw in payload.get('tickets') or []])
         log(conn, actor, 'create_case', case_id)
         return found(conn, cases, case_id)
 
@@ -73,7 +77,8 @@ def claim():
         token = str(uuid.uuid4())
         conn.execute(runs.update().where(runs.c.id == run.id).values(
             started_at=utc_time(), status=Status.RUNNING, attempt_token=token))
-        return run.id, token, found(conn, cases, run.case_id)['payload']
+        case = found(conn, cases, run.case_id)
+        return run.id, token, ticket_store.replay_payload(conn, case)
 
 
 def finish(run_id, token, result=None, error=None):
@@ -88,6 +93,22 @@ def finish(run_id, token, result=None, error=None):
         if result is not None:
             conn.execute(evidence.insert().values(run_id=run_id, report=result, digest=digest))
         log(conn, 'worker', status.value, run_id)
+
+
+def list_case_tickets(case_id):
+    """按档案查取号单：新表优先，未回填的档案回退档案 JSON。"""
+    with engine.connect() as conn:
+        case = found(conn, cases, case_id)
+        rows, _ = ticket_store.effective_tickets(conn, case)
+        return rows
+
+
+def find_case_ticket(case_id, ticket_id):
+    wanted = ticket_id.strip()
+    for row in list_case_tickets(case_id):
+        if row['ticket_id'] == wanted:
+            return row
+    raise HTTPException(404, '找不到该取号单')
 
 
 def review(identity, note, actor):

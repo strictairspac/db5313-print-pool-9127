@@ -35,6 +35,15 @@ docker compose up -d --build --wait
 
 `SEED_DEMO=true` 启动时生成账号与一个业务样例。工作台新建档案会预填样例。可编辑表单中的数值、文本和结构化 JSON 后提交。业务说明中的原始文件是上游示例，演示数据通过表单录入。角色枚举位于后端 `src/constants/workflow.py` 与前端 `src/constants/workflow.js`。执行状态枚举也位于这两个文件，使用于队列、列表和执行详情。证据校验码是报告 JSON 按 UTF-8、键排序且省略多余空格序列化后的 SHA-256。
 
+## 取号单拆分存储
+
+档案中的取号单同时写入 `case_tickets` 表（档案 JSON 保持完整，便于回滚）。值班时可通过接口按档案和单号查询：
+
+- `GET /api/cases/{档案编号}/tickets` 列出该档案全部取号单
+- `GET /api/cases/{档案编号}/tickets/{单号}` 查询单张取号单
+
+旧档案回填、核对与切换见 [backend/migrations/README.md](backend/migrations/README.md)，命令为 `docker compose exec -T backend python -m scripts.migrate_tickets <status|backfill|verify|cutover|rollback>`。
+
 ## 工程结构
 
 | 服务 | 实现 |

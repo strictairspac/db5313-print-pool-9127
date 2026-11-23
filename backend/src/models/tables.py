@@ -1,5 +1,5 @@
 from sqlalchemy import (JSON, Column, ForeignKey, Integer, MetaData, String,
-                        Table, Text)
+                        Table, Text, UniqueConstraint)
 
 schema = MetaData()
 users = Table('accounts', schema,
@@ -38,3 +38,18 @@ audit = Table('audit_events', schema,
     Column('action', String(32), nullable=False),
     Column('reference', String(50), nullable=False),
     Column('created_at', String(32), nullable=False))
+case_tickets = Table('case_tickets', schema,
+    Column('id', Integer, primary_key=True),
+    Column('case_id', ForeignKey('business_cases.id'), nullable=False, index=True),
+    Column('ticket_id', String(64), nullable=False),
+    Column('tenant', String(64), nullable=False),
+    Column('priority', String(8), nullable=False),
+    Column('arrival_ms', Integer, nullable=False),
+    Column('hold_ms', Integer, nullable=False),
+    Column('wait_budget_ms', Integer, nullable=False),
+    UniqueConstraint('case_id', 'ticket_id', name='uq_case_ticket'))
+migration_state = Table('migration_state', schema,
+    Column('id', Integer, primary_key=True),
+    Column('checkpoint', Integer, nullable=False),
+    Column('phase', String(20), nullable=False),
+    Column('updated_at', String(32), nullable=False))

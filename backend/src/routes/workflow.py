@@ -39,6 +39,16 @@ def create_case(form: CaseForm, actor=Depends(operator)):
     return workflow.make_case(form.title, form.payload, actor)
 
 
+@router.get('/cases/{case_id}/tickets')
+def list_case_tickets(case_id: int, _=Depends(current_user)):
+    return workflow.list_case_tickets(case_id)
+
+
+@router.get('/cases/{case_id}/tickets/{ticket_id}')
+def get_case_ticket(case_id: int, ticket_id: str, _=Depends(current_user)):
+    return workflow.find_case_ticket(case_id, ticket_id)
+
+
 @router.get('/runs')
 def list_runs(_=Depends(current_user)):
     return workflow.recent(runs)
